@@ -27,8 +27,9 @@ def affine_forward(x, w, b):
     # will need to reshape the input into rows.                               #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
+    
+    num_examples = x.shape[0]
+    out = x.reshape(num_examples, -1) @ w + np.expand_dims(b, axis=0) # shape (N, M)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -61,7 +62,11 @@ def affine_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    num_examples = x.shape[0]
+
+    db = np.sum(dout, axis=0) # shape (M, )
+    dx = (dout @ w.T).reshape(x.shape)
+    dw = x.reshape(num_examples, -1).T @ dout
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -87,7 +92,8 @@ def relu_forward(x):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    out = np.zeros_like(x)
+    out[x >= 0] = x[x >= 0] 
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -114,7 +120,8 @@ def relu_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    dx = np.zeros_like(dout)
+    dx[x >= 0] = dout[x >= 0]
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -773,7 +780,22 @@ def svm_loss(x, y):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    loss = 0
+    num_examples = x.shape[0]
+
+    # compute loss
+    correct_class_score = np.expand_dims(x[range(num_examples), y], axis=1)  # shape (N, 1)
+    margins = x - correct_class_score + 1
+    margins[range(num_examples), y] = -np.inf
+    mask = margins > 0  # scores that contributed to loss, shape (N, C) 
+    margins = margins[mask]
+    loss += np.sum(margins) / num_examples
+
+    # compute gradient
+    dx = np.zeros_like(x)
+    dx[mask] = 1
+    dx[range(num_examples), y] = - np.sum(mask, axis=1)
+    dx *= 1 / num_examples # d_L_i = 1 / num_examples
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -803,7 +825,15 @@ def softmax_loss(x, y):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    num_examples = x.shape[0]
+    prob = np.exp(x - np.max(x, axis=1, keepdims=True)) / np.sum(np.exp(x - np.max(x, axis=1, keepdims=True)), axis=1, keepdims=True) # shape (N, C)
+    correct_class_prob = prob[range(num_examples), y]
+    losses = - np.log(correct_class_prob)
+    loss = np.sum(losses) / num_examples
+
+    dx = prob
+    dx[range(num_examples), y] -= 1
+    dx *= 1 / num_examples # d_L_i = 1 / num_train
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################

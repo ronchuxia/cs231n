@@ -137,7 +137,7 @@ class KNearestNeighbor(object):
         # MemoryError: Unable to allocate 57.2 GiB for an array with shape (500, 5000, 3072) and data type float64
         # dists = np.sqrt(np.sum(np.power(np.expand_dims(X, axis=1) - np.expand_dims(self.X_train, axis=0), 2), axis=2))
 
-        # NOTE: 将内积展开，即可拆分为矩阵乘法
+        # NOTE: expand the inner product as matrix multiplications
         X_squared = np.sum(np.power(X, 2), axis=1, keepdims=True)   # shape (num_test, 1)
         X_train_squared = np.sum(np.power(self.X_train, 2), axis=1, keepdims=True)  # shape (num_train, 1)
         dists = np.sqrt(X_squared + X_train_squared.T - 2 * X @ self.X_train.T)

@@ -55,7 +55,16 @@ class TwoLayerNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        W1 = weight_scale * np.random.randn(input_dim, hidden_dim)
+        b1 = np.zeros(hidden_dim)
+
+        W2 = weight_scale * np.random.randn(hidden_dim, num_classes)
+        b2 = np.zeros(num_classes)
+
+        self.params["W1"] = W1
+        self.params["b1"] = b1
+        self.params["W2"] = W2
+        self.params["b2"] = b2
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -88,7 +97,8 @@ class TwoLayerNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        hidden, hidden_cache = affine_relu_forward(X, self.params["W1"], self.params["b1"])
+        scores, scores_cache = affine_forward(hidden, self.params["W2"], self.params["b2"])
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -112,7 +122,24 @@ class TwoLayerNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        CE_loss, d_scores_d_CE_loss = softmax_loss(scores, y) # d_scores_d_CE_loss: shape (N, C)
+        loss += CE_loss
+        reg_loss =  0.5 * self.reg * (np.sum(np.square(self.params["W1"])) + np.sum(np.square(self.params["W2"])))
+        loss += reg_loss
+
+        # back propagate CE loss
+        d_scores = d_scores_d_CE_loss * 1 # shape (N, C)
+        d_hidden, d_W2, d_b2 = affine_backward(d_scores, scores_cache)
+        d_X, d_W1, d_b1 = affine_relu_backward(d_hidden, hidden_cache)
+
+        # back propagate regularization loss
+        d_W1 += self.reg * self.params["W1"]
+        d_W2 += self.reg * self.params["W2"]
+
+        grads["W1"] = d_W1
+        grads["b1"] = d_b1
+        grads["W2"] = d_W2
+        grads["b2"] = d_b2
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
