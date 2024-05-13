@@ -74,7 +74,32 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        # initialize weight and bias for the first layer
+        W1 = weight_scale * np.random.randn(input_dim, hidden_dims[0])
+        b1 = np.zeros(hidden_dims[0])
+        self.params["W1"] = W1
+        self.params["b1"] = b1
+
+        # initialize weight and bias for the hidden layers
+        for i in range(1, len(hidden_dims)):
+            W = weight_scale * np.random.randn(hidden_dims[i-1], hidden_dims[i])
+            b = np.zeros(hidden_dims[i])
+            self.params["W{}".format(i + 1)] = W
+            self.params["b{}".format(i + 1)] = b
+
+        # initialize weight and bias for the last layer
+        W = weight_scale * np.random.randn(hidden_dims[-1], num_classes)
+        b = np.zeros(num_classes)
+        self.params["W{}".format(self.num_layers)] = W
+        self.params["b{}".format(self.num_layers)] = b
+
+        # initialize batch / layer normalization parameters (scale and shift)
+        if self.normalization in ["batchnorm", "layernorm"]:
+            for i in range(0, len(hidden_dims)):
+                gamma = np.ones(hidden_dims[i])
+                beta = np.zeros(hidden_dims[i])
+                self.params["gamma{}".format(i + 1)] = gamma
+                self.params["beta{}".format(i + 1)] = beta
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -148,7 +173,34 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        cache = {}  # A dictionary to store all caches
+
+        # forward pass the first and the hidden layers
+        for i in range(1, self.num_layers):
+            # affine transformation
+            X, affine_cache = affine_forward(X, self.params["W{}".format(i)], self.params["b{}".format(i)])
+            cache["affine{}".format(i)] = affine_cache
+
+            # normalization
+            if self.normalization == "batchnorm":
+                X, bn_cache = batchnorm_forward(X, self.params["gamma{}".format(i)], self.params["beta{}".format(i)], self.bn_params[i - 1])
+                cache["bn{}".format(i)] = bn_cache
+            if self.normalization == "layernorm":
+                X, ln_cache = layernorm_forward(X, self.params["gamma{}".format(i)], self.params["beta{}".format(i)], self.bn_params[i - 1])
+                cache["ln{}".format(i)] = ln_cache
+
+            # relu
+            X, relu_cache = relu_forward(X)
+            cache["relu{}".format(i)] = relu_cache
+
+            # dropout
+            if self.use_dropout:
+                X, dropout_cache = dropout_forward(X, self.dropout_param)
+                cache["dropout{}".format(i)] = dropout_cache
+
+        # forward pass the last layer
+        scores, affine_cache = affine_forward(X, self.params["W{}".format(self.num_layers)], self.params["b{}".format(self.num_layers)])
+        cache["affine{}".format(self.num_layers)] = affine_cache
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -175,7 +227,52 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        # forward pass CE loss
+        CE_loss, d_scores_d_CE_loss = softmax_loss(scores, y)   # d_scores_d_CE_loss: shape (N, C)
+        loss += CE_loss
+
+        # forward pass regularization loss
+        reg_loss = 0
+        for i in range(self.num_layers):
+            reg_loss += 0.5 * self.reg * np.sum(np.square(self.params["W{}".format(i + 1)]))
+        loss += reg_loss
+
+        # back propagate CE loss
+        d_scores = d_scores_d_CE_loss * 1   # shape (N, C)
+
+        # back propagate the last layer
+        d_hidden, d_W, d_b = affine_backward(d_scores, cache["affine{}".format(self.num_layers)])
+        grads["W{}".format(self.num_layers)] = d_W
+        grads["b{}".format(self.num_layers)] = d_b
+
+        # back propagate the hidden layers and the first layer
+        for i in range(self.num_layers - 1, 0, -1):
+            # dropout
+            if self.use_dropout:
+                d_hidden = dropout_backward(d_hidden, cache["dropout{}".format(i)])
+
+            # relu
+            d_hidden = relu_backward(d_hidden, cache["relu{}".format(i)])
+
+            # normalization
+            if self.normalization == "batchnorm":
+                d_hidden, d_gamma, d_beta = batchnorm_backward(d_hidden, cache["bn{}".format(i)])
+                grads["gamma{}".format(i)] = d_gamma
+                grads["beta{}".format(i)] = d_beta
+            if self.normalization == "layernorm":
+                d_hidden, d_gamma, d_beta = layernorm_backward(d_hidden, cache["ln{}".format(i)])
+                grads["gamma{}".format(i)] = d_gamma
+                grads["beta{}".format(i)] = d_beta
+
+            # affine transformation
+            d_hidden, d_W, d_b = affine_backward(d_hidden, cache["affine{}".format(i)])
+            
+            grads["W{}".format(i)] = d_W
+            grads["b{}".format(i)] = d_b
+
+        # back propagate regularization loss
+        for i in range(self.num_layers):
+            grads["W{}".format(i + 1)] += self.reg * self.params["W{}".format(i + 1)]
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
