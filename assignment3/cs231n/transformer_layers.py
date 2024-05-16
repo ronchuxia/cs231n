@@ -38,7 +38,11 @@ class PositionalEncoding(nn.Module):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        positions = torch.arange(0, max_len)  # shape (max_len, )
+        exponents = torch.arange(0, embed_dim, 2) # shape (embed_dim // 2, )
+        
+        pe[:, :, 0::2] = torch.sin(torch.outer(positions, torch.pow(10000, - exponents / embed_dim)))
+        pe[:, :, 1::2] = torch.cos(torch.outer(positions, torch.pow(10000, - exponents / embed_dim)))
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -70,7 +74,9 @@ class PositionalEncoding(nn.Module):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        pe = self.pe[:, :S, :D]
+        output = x + pe
+        output = self.dropout(output)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -165,7 +171,25 @@ class MultiHeadAttention(nn.Module):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        H = self.n_head
+        D = self.head_dim
+
+        query = self.query(query)
+        key = self.key(key)
+        value = self.value(value)
+        query_multihead = torch.reshape(query, (N, S, H, D))
+        key_multihead = torch.reshape(key, (N, T, H, D))
+        value_multihead = torch.reshape(value, (N, T, H, D))
+
+        attention_scores = torch.matmul(torch.permute(query_multihead, (0, 2, 1, 3)), torch.permute(key_multihead, (0, 2, 3, 1))) / math.sqrt(self.head_dim)  # shape (N, H, S, T)
+        if attn_mask != None: # mask
+          attention_scores.masked_fill_(attn_mask == 0, - torch.inf) 
+        attention_scores = torch.nn.functional.softmax(attention_scores, dim=-1)  # softmax
+        attention_scores = self.attn_drop(attention_scores) # dropout
+
+        output = torch.matmul(attention_scores, torch.permute(value_multihead, (0, 2, 1, 3))) # shape (N, H, S, E/H)
+        output = torch.reshape(torch.permute(output, (0, 2, 1, 3)), (N, S, E))
+        output = self.proj(output)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
